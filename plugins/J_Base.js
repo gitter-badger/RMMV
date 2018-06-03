@@ -30,13 +30,13 @@
 @desc This is the icon ID for the LUK stat to be displayed.
 @default 255
 @param EXP-icon
-@desc This is the icon ID for the LUK stat to be displayed.
+@desc This is the icon ID for the EXP stat to be displayed.
 @default 125
 @param GOLD-icon
-@desc This is the icon ID for the LUK stat to be displayed.
+@desc This is the icon ID for the GOLD stat to be displayed.
 @default 313
 @param DROP-icon
-@desc This is the icon ID for the LUK stat to be displayed.
+@desc This is the icon ID for the 182 stat to be displayed.
 @default 182
 @param ---SPARAM---
 @param TGR-text
@@ -223,24 +223,48 @@ function IconManager() {
 // this applies to any command window in the game.
 IconManager.textForIcon = function (text) {
   switch (text) {
-    case TextManager.item: return 209;
+    case TextManager.item: return 372;
     case TextManager.skill: return 78;
-    case TextManager.equip: return 137;
+    case TextManager.equip: return 550;
     case TextManager.optimize: return 90;
-    case TextManager.clear: return 118;
+    case TextManager.clear: return 91;
     case TextManager.status: return 84;
     case TextManager.formation: return 82;
     case TextManager.options: return 83;
     case TextManager.save: return 79;
     case TextManager.gameEnd: return 91;
-    case TextManager.newGame: return 225;
-    case TextManager.continue_: return 189;
-    case TextManager.weapon: return 197;
-    case TextManager.armor: return 132;
-    case TextManager.keyItem: return 195;
-    case J.AddOns.Difficulty.getDifficultyName(0): return 96;
-    case J.AddOns.Difficulty.getDifficultyName(1): return 97;
-    case J.AddOns.Difficulty.getDifficultyName(2): return 112;
+    case TextManager.newGame: return 480;
+    case TextManager.continue_: return 342;
+    case TextManager.weapon: return 501;
+    case TextManager.armor: return 548;
+    case TextManager.keyItem: return 352;
+    case "Allocate": return 457;
+    case J.AddOns.Difficulty.getDifficultyName(0): return 497;
+    case J.AddOns.Difficulty.getDifficultyName(1): return 498;
+    case J.AddOns.Difficulty.getDifficultyName(2): return 501;
+    case "Load": return 342;
+    case "Delete": return 91;
+
+    // for handling SRD_StatDistribution
+    case "Life Improver": return J.Icon.MHP_icon;
+    case "Yggdrasil Force": return J.Icon.HRG_icon;
+    case "Mind Expansion": return J.Icon.MMP_icon;
+    case "Meditation": return J.Icon.MRG_icon;
+    case "Power Blows": return J.Icon.ATK_icon;
+    case "Prowess": return J.Icon.TRG_icon;
+    case "Warrior's Eye": return J.Icon.TCR_icon;
+    case "Critical Edge": return J.Icon.CRI_icon;
+    case "Endurance Up": return J.Icon.DEF_icon;
+    case "Golem Heart": return J.Icon.PDR_icon;
+    case "Healing Amp": return J.Icon.REC_icon;
+    case "Force Focus": return J.Icon.MAT_icon;
+    case "Mage's Eye": return J.Icon.MCR_icon;
+    case "Magic Defense": return J.Icon.MDF_icon;
+    case "Planar Shield": return J.Icon.MDR_icon;
+    case "Good Fortune": return J.Icon.LUK_icon;
+    case "Sage's Wisdom": return J.Icon.EXP_icon;
+    case "Trap Guard": return J.Icon.FDR_icon;
+
     default: return 0;
   }
 }
@@ -466,7 +490,7 @@ Scene_Map.prototype.hideExtras = function() {
 
 /* -------------------------------------------------------------------------- */
 //    NOTE READING
-// Rather than blitz through the notes multiple times, I opted to put all the
+// Rather than blitz through the notes multiple times, I opted to put much of the
 // note reading into this function, so other plugins like J_XPGPvariance will
 // need this to function. Since otherwise, this does basically nothing by
 // itself, it shouldn't be too harmful. (right?)
@@ -506,10 +530,10 @@ DataManager.jadd_readNotes = function(data) {
                     dataId: 1,      // default: ID 1
                 };
                 switch (String(RegExp.$1).toLowerCase()) {
-                    case "i": drop.kind = 1;
-                    case "w": drop.kind = 2;
-                    case "a": drop.kind = 3;
-                    default: drop.kind = 1;
+                    case "i": drop.kind = 1; break;
+                    case "w": drop.kind = 2; break;
+                    case "a": drop.kind = 3; break;
+                    default: drop.kind = 1; break;
                 };
                 drop.dataId = Number(RegExp.$2); // ID of drop
                 drop.denominator = Number(RegExp.$3); // rate of drop
@@ -518,7 +542,7 @@ DataManager.jadd_readNotes = function(data) {
             else if (line.match(structure2)) {
               enemy.level = Number(RegExp.$1); // assigns them a new level
             }
-            else if (line.match(structure3)) {
+            else if (line.match(structure3)) { // assigns them gp drop variance amount
               enemy.gpvar = Number(RegExp.$1);
             }
         }

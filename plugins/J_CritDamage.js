@@ -1,6 +1,6 @@
 /* -------------------------------------------------------------------------- */
-// J_CritDamage
-// V: 1.0
+// J_critDamage
+// V: 1.1
 //
 /*:@plugindesc Creates new paramters: CDM/CDR for crit damage manipulation.
 @author Jpoop
@@ -8,21 +8,29 @@
         calculate crit damage multipliers/reductions.
 
         Use:
-        <cdm:+/-x>
-        <cdr:+/-x>
+          <cdm:+/-x>
+          <cdr:+/-x>
 
         for crit damage multiplier(cdm) or crit damage reduction(cdr).
 
         Example:
-        <cdm:+175>
-        <cdr:+25>
+          <cdm:+175>
+          <cdr:+25>
 
         Notes can be placed in many places.
-        Base parameter: actor/enemy page.
+        Base parameter: actor/enemy page. (note: base stats don't have +/- !)
+          Example:
+            <cdm:200>
+            <cdr:10>
         bonus parameter (adds with others): class, equipment, states
+          Example:
+            <cdm:+50> << +50% crit damage when landing crits.
+            <cdr:+25> << -25% damage received when hit with a crit.
 
-        if no base is defined, base will default to 1.5.
-        bonuses will add together.
+        if no base is defined:
+          base cdm will default to 1.5 (150% damage when landing crits).
+          base cdr will default to 0 (receive full damage from crits).
+        bonuses from class/equips/states will add together.
         use whole numbers like 150 for 1.5x, or 75 for 0.75x.
 */
 /* -------------------------------------------------------------------------- */
@@ -32,6 +40,7 @@ Game_Action.prototype.applyCritical = function(damage) {
   var attacker = this.subject();
   if (attacker.cdm > 0) {
     var critDamageRatio = attacker.cdm;
+    console.log("cdm: " + attacker.cdm);
   } else {
     var critDamageRatio = 1.5;
   }
@@ -43,6 +52,7 @@ var _Game_Action_jCritDmg_mdv = Game_Action.prototype.makeDamageValue;
 Game_Action.prototype.makeDamageValue = function(target, critical) {
    var originalDmg = _Game_Action_jCritDmg_mdv.call(this, target, critical);
    if (critical) {
+     console.log("cdr: " + target.cdr);
      var modDmg = originalDmg * (1 - target.cdr);
    }
    return Math.round(originalDmg);
@@ -102,7 +112,7 @@ Game_Battler.prototype.jParamBase = function(battler, paramId) {
   var notedata = item.note.split(/[\r\n]+/);
   for (var n = 0; n < notedata.length; n++) {
     var line = notedata[n];
-    if (line.match(structure)) { total = Number(RegExp.$1); }
+    if (line.match(structure)) { console.log(RegExp.$1);total = Number(RegExp.$1); }
   }
   return total;
 };

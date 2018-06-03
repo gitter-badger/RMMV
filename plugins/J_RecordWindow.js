@@ -1,6 +1,6 @@
 /* -------------------------------------------------------------------------- */
 // J_RecordWindow
-// V: 1.0
+// V: 1.1
 //
 
 /*:@plugindesc This plugin creates a window that acts as a log for EXP/GOLD/items acquired.
@@ -19,22 +19,30 @@
       is reset. This repeats until all items are emptied from the
       queue.
 
-      NOTE:
-      This plugin draws in the EXP earned either via events or from
-      defeating enemies. Note: negative parameters such as losing
-      EXP / gold / items will be displayed as "gained -x stuff"
-      because it was designed that way. I'm sure you could modify
-      the switch with the text if you wanted to make it accommodate
-      both negative and positive experiences with exp/gold/items.
+      You can add "<no record>" to an item's notebox to make it so the
+      item won't show up in the record window.
 
-      As a person relatively new to writing code for use by others,
-      I left a crap-ton of comments all throughout the code if you
-      are interested in understanding how it works. If you want to
-      optimize it, feel free, but be sure to let me know what you
-      did so I can learn how too! :)
+      PLUGIN COMMANDS:
 
-      This plugin has no dependencies.
+        JRW item_type item_id
+        where item_type = i w a
+        where item_id = the id of the item in the database
+        example: JRW i 7
+        will pop item w/ ID7 into the record window.
+        
+        JRW clear
+        to clear the entire record window.
+
+
+
+      This plugin has no dependencies, but was crafted to compliment
+      ABS-style battle systems.
       Just use as-is.
+
+      v1.1: Added "<no record>" functionality to block item popups.
+      v1.1: Added a catch to prevent drawing negative xp/gp.
+      v1.1: Added user-modifiable entries for dictating the gold/exp icons.
+      v1.1: Added plugin commands for forcing an item, and clearing.
 
 @param w_width
 @desc Window width of the record box.
@@ -48,6 +56,13 @@
 @desc The time in frames (60 frames = 1 second, roughly) before stuff starts disappearing
 @default 120
 
+@param expIcon
+@desc The icon used for experience gains. Overwritten by J_Base if that plugin is above this.
+@default 87
+
+@param goldIcon
+@desc The icon used for gold pickups. Overwritten by J_Base if that plugin is above this.
+@default 314
 */
 var Imported = Imported || {};
 Imported.J_RecordWindow = true;
@@ -58,9 +73,27 @@ J.Records.parameters = PluginManager.parameters('J_RecordWindow');
 J.Records.winWidth = Number(J.Records.parameters['w_width']) || 400; // wide enough for most things
 J.Records.winHeight = Number(J.Records.parameters['w_height']) || 196; // enough for 5 lines
 J.Records.stallMod = Number(J.Records.parameters['stallMod']) || 120; // 2 second stall
+J.Records.expIcon = Number(J.Records.parameters['expIcon']);
+J.Records.goldIcon = Number(J.Records.parameters['goldIcon']);
+J.Records.visibility = true;
 
 (function() { // start plugin.
-/* -------------------------------------------------------------------------- */
+/* -------------------------------------------------------------------------- */ 
+  var _Game_Interpreter_jRecords_pluginCommand = Game_Interpreter.prototype.pluginCommand;
+  Game_Interpreter.prototype.pluginCommand = function(command, args) {
+    _Game_Interpreter_jRecords_pluginCommand.call(this, command, args);
+    if (command === 'JRW') {
+      switch (args[0]) {
+        case 'hide':
+          J.Records.visibility = false;
+          break;
+        case 'show':
+          J.Records.visibility = true;
+          break;
+      }
+    }
+  };
+
 // if the window on the map doesn't exist, make it.
 // if it does exist, update it.
 // if there is stuff going on, hide window.
@@ -74,7 +107,7 @@ Scene_Map.prototype.handleRecordBox = function() {
     this._recordWindow = new Window_Record(wx, hy, J.Records.winWidth, J.Records.winHeight);
     this.addWindow(this._recordWindow);
   };
-  if (this.hideExtras()) {
+  if (J.Records.visibility == false || this.hideExtras()) {
     this._recordWindow.close();
   }
   else {
@@ -136,6 +169,12 @@ Scene_Map.prototype.update = function() {
   Game_Party.prototype.gainItem = function(item, amount, includeEquip) {
     _Game_Party_jrw_gainItem.call(this, item, amount, includeEquip);
     var scene = SceneManager._scene;
+    if (amount < 1) return; // ignores lost items.
+    if (item == null) return;
+    // parse for note data saying "no record"
+    var notedata = item.note.split(/[\r\n]+/);
+    for (var n = 0; n < notedata.length; n++) { if (notedata[n].match(/<no record>/i)) { return; } }
+
     if (item != null) { // this check is necessary to prevent errors in Scene_Equip
       var i = new Record_Item(item.name, 0, item.iconIndex);
       if (scene.constructor == Scene_Map) {
@@ -191,10 +230,17 @@ Scene_Map.prototype.update = function() {
 
   // function for deleting an item from the window
   // removes the item at 0 index.
-  Window_Record.prototype.RemoveItem = function() {
+  Window_Record.prototype.removeItem = function() {
     this.contentsOpacity = 255;
     this._list.shift();
   };
+
+  // function for clearing out the entire list
+  // only used with plugin commands.
+  Window_Record.prototype.clearList = function() {
+    this._list = [];
+    this.refresh();
+  }
 
   // function for updating all items in the window
   Window_Record.prototype.updateItems = function() {
@@ -208,7 +254,7 @@ Scene_Map.prototype.update = function() {
       }
       else {
         if (nextItem._duration <= 0) { // if stall is passed
-          this.RemoveItem(nextItem);   // remove item with no duration
+          this.removeItem(nextItem);   // remove item with no duration
         }
         else {
         nextItem._duration--;         // reduces duration of next item
@@ -229,21 +275,30 @@ Scene_Map.prototype.update = function() {
 
   Window_Record.prototype.drawListItem = function(i, x, y) {
     var w = J.test_bWidth - (this.standardPadding() * 2);
+    var xIcon = J.Records.expIcon;
+    var gIcon = J.Records.goldIcon;
+    if (Imported.J_Base) {
+      xIcon = J.Icon.EXP_icon;
+      gIcon = J.Icon.GOLD_icon;
+    }
+    var oldSize = this.contents.fontSize;
+    this.contents.fontSize = 12;
     switch (i._type) {
       case 0: // for items
         this.drawIcon(i._iconIndex, x, y);
         this.drawText(i._name + " found.", x + 32, y, w);
       break;
       case 1: // for experience
-        this.drawIcon(87, x, y);
+        this.drawIcon(xIcon, x, y);
         this.drawText(i._name + " experience gained.", x + 32, y, w)
       break;
       case 2: // for gold
-        this.drawIcon(314, x, y);
+        this.drawIcon(gIcon, x, y);
         this.drawText(i._name +' picked up.', x + 32, y, w)
       break;
       default: break; // there shouldn't be a need default case
     }
+    this.contents.fontSize = oldSize;
   };
 /* -------------------------------------------------------------------------- */
 // type 0 = item
@@ -260,5 +315,58 @@ Record_Item = function(name, type, icon, duration) {
   this._duration = typeof duration !== 'undefined' ? duration : 60;
 };
 
+// extra plugin command of
+// JRW item_type item_id
+// ex: JRW i 10
+// item_type = i OR w OR a  ==  item OR weapon OR armor
+// item_id = the ID in the database for that item.
+var j_rw_Game_Interpreter_pluginCommand = Game_Interpreter.prototype.pluginCommand;
+Game_Interpreter.prototype.pluginCommand = function(command, args) {
+  j_rw_Game_Interpreter_pluginCommand.call(this, command, args);
+  // command args[0] args[1] args[2] ...
+  try {
+    if (command ==='JRW') {
+      var scene = SceneManager._scene;
+      if (scene.constructor != Scene_Map) return;
+  
+      var ri = { name: "", type: 0, icon: 0, duration: 60 }
+      switch (args[0]) {
+        case 'i':
+        case 'I':
+          var temp = $dataItems[args[1]];
+          ri.name = temp.name;
+          ri.icon = temp.iconIndex;
+          ri.type = 0;
+          var pluginItem = new Record_Item(ri.name, ri.type, ri.icon);
+          scene._recordWindow.addItem(pluginItem);
+          break;
+        case 'w':
+        case 'W':
+          var temp = $dataWeapons[args[1]];
+          ri.name = temp.name;
+          ri.icon = temp.iconIndex;
+          ri.type = 0;
+          var pluginItem = new Record_Item(ri.name, ri.type, ri.icon);
+          scene._recordWindow.addItem(pluginItem);
+          break;
+        case 'a':
+        case 'A':
+          var temp = $dataArmors[args[1]];
+          ri.name = temp.name;
+          ri.icon = temp.iconIndex;
+          ri.type = 0;
+          var pluginItem = new Record_Item(ri.name, ri.type, ri.icon);
+          scene._recordWindow.addItem(pluginItem);
+          break;
+        case 'clear':
+          scene._recordWindow.clearList();
+          break;
+        default: break;
+      }
+    }
+  } catch(e) {
+    console.warn(e);
+  }
+};
 /* -------------------------------------------------------------------------- */
 })(); // end plugin.

@@ -1,20 +1,73 @@
 /* -------------------------------------------------------------------------- */
 // J_Difficulty
-// V: 1.0
+// V: 1.1
 //
+
 
 /*:@plugindesc Provides difficulty options for the the player that modify enemy stats.
 @author J
 
-@help In short, this adds a command to the main menu that sends the player to
-        another scene that lets them change the difficulty to one of a few preset
-        difficulties that modify enemy parameters making enemies either
-        tougher or wimpier. This can affect literally any of the default
-        parameters, s-parameters, and x-parameters, and also their XP/GP rates,
-        and also item drop rates. I included three difficulties by default, but
-        if you can see the pattern, you are free to add/subtract/change the
-        difficulties as you see fit. I did not create any plugin parameters
-        because lets be real, that would just be a pain for something like this.
+@help This plugin adds a new command to the main menu that represents the game's
+  difficulty. "Difficulty"s are named, and act as multipliers against the
+  enemies' various b/s/x parameters. It can also impact their exp/gold and
+  even their drop rates.
+
+  There are five plugin commands you can use to manipulate this plugin:
+
+  ADD:
+  JDIFF add param0 param1 param2 etc... param26
+
+  example:
+    JDIFF add 100 100 100 100 100 100 100 100 100 100 100 100 100 100 100 100 100 100 100 100 100 100 100 100 100 100
+  translates to:
+    basically the normal mode down below, lol.
+
+  No commas necessary.
+  Just a space between each parameter.
+  Be careful not to miss one or it could break the plugin and crash the game.
+
+  REMOVE:
+  JDIFF remove [number of difficulty or name of difficulty]
+
+  example:
+    JDIFF remove 1
+  translates to:
+    remove the first difficulty in the list (easy by default)
+  
+  example:
+    JDIFF remove Normal
+  translates to:
+    remove the difficulty named "Normal".
+    (name of difficulty IS case sensitive)
+  
+  CHANGE:
+  JDIFF change [name of difficulty]
+
+  example:
+    JDIFF change Easy
+  translates to:
+    change the current difficulty mode to "Easy" mode.
+    (name of difficulty IS case sensitive)
+
+  SHOW:
+  JDIFF show
+
+  HIDE:
+  JDIFF hide
+
+  show and hide will do exactly what you think: show and hide the difficulty
+  menu item.
+  
+  NOTE: if you decide to hide the difficulty, it does not disable the them.
+    If you hide it while at "Hard", and enemies are stronger, they will just 
+    stay stronger.
+
+@param Difficulty Variable
+@desc Assigns the difficulty to this variable. 0 = no assignment.
+@default 10
+
+  This plugin is standalone and has no dependencies.
+  Just let me know if you plan on using it for anything serious :)
 */
 
 var Imported = Imported || {};
@@ -23,78 +76,52 @@ Imported.J_Difficulty = true;
 J.AddOns = J.AddOns || {};
 J.AddOns.Difficulty =   J.AddOns.Difficulty || {};
 J.AddOns.Difficulty.Modes = [];
+J.AddOns.Difficulty.visibility = true;
+J.AddOns.Difficulty.Parameters = PluginManager.parameters('J_HUD');
+J.AddOns.Difficulty.dVariable = Number(J.AddOns.Difficulty.Parameters['Difficulty Variable']);
 
-(function() { // wrap the variables in this so they aren't global.
-// the various functions can stay out and free, though since they are attached
-// to the base "module" of J.AddOns.Difficulty.*
-// These difficulties can be seen as "sample" difficulties. Feel free to modify
-// them, add more difficulties, remove them, whatever. It is yours to play with.
-// just make sure you do three things:
-//   1.) create the difficulty variable (as seen below)
-//   2.) add it to the J.AddOns.Difficulty.Modes array ()
-//   3.) decide an icon for it! (in J_Base, if you are using that.)
+
+// creates a new Difficulty mode based on the provided parameters.
+J.AddOns.Difficulty.makeDifficulty = function(namediff, exprate, goldrate, droprate, 
+  maxHP, maxMP, agility, attack, defense, luck, matk, mdef,
+  hitrate, evade, counter, crit, critdodge, mevade, mreflect, 
+  hpregen, mpregen, target, guard, recovery, physrate, magirate) {
+    var diff = {
+      name: namediff,
+      exp: exprate,   gold: goldrate, drop: droprate,
+      mhp: maxHP,     mmp: maxMP,     agi: agility,
+      atk: attack,    def: defense,   luk: luck,
+      mat: matk,      mdf: mdef,
+  
+      hit: hitrate,   eva: evade,     cnt: counter,
+      cri: crit,      cev: critdodge,
+      mev: mevade,    mrf: mreflect,
+      hrg: hpregen,   mrg: mpregen,   trg: target,
+    // note1: PDR and MDR want to be lower.
+    // note2: TGR, PHA, TCR, FDR, and EXR aren't usually used for enemies.
+    // tgr: 200, mcr: 200, pha: 100, tcr: 200, exr: 200, fdr: 200,
+      grd: guard,  rec: recovery,  pdr: physrate,  mdr: magirate
+    };
+    J.AddOns.Difficulty.Modes.push(diff);
+  }
 /* -------------------------------------------------------------------------- */
-  var easy = {
-    name: "Easy",
-    exp: 50,  gold: 25, drop: 25,
+J.AddOns.Difficulty.makeDifficulty("Easy", 50, 25, 25, 
+  50, 100, 75, 50, 75, 100, 50, 75, 
+  100, 0, 50, 50, 0, 0, 50, 50, 50, 50, 
+  0, 100, 100, 100);
 
-    mhp: 50,  mmp: 100,  agi: 75,
-    atk: 50,  def: 75,   luk: 100,
-    mat: 50,  mdf: 75,
+J.AddOns.Difficulty.makeDifficulty("Normal", 100, 100, 100,
+  100, 100, 100, 100, 100, 100, 100, 100,
+  100, 100, 100, 100, 100, 100, 100, 100, 100, 100,
+  100, 100, 100, 100);
 
-    hit: 100,  eva: 0,   cnt: 50,
-    cri: 50,   cev: 0,
-    mev: 0,    mrf: 50,
-    hrg: 50,   mrg: 50,  trg: 50,
-  // note1: PDR and MDR want to be lower.
-  // note2: TGR, PHA, TCR, FDR, and EXR aren't usually used for enemies.
-  // tgr: 200, mcr: 200, pha: 100, tcr: 200, exr: 200, fdr: 200,
-    grd: 0,  rec: 100,  pdr: 100,  mdr: 100,
-  };
+J.AddOns.Difficulty.makeDifficulty("Hard", 150, 200, 200,
+  150, 100, 125, 150, 125, 150,
+  150, 100, 150, 150, 150, 100, 150, 150, 150, 150,
+  200, 150, 150, 150);
 
-  // normal is assumed to be default, aka what you write in the database.
-var normal  = {
-  name: "Normal",
-  exp: 100,  gold: 100, drop: 100,
-
-  mhp: 100,  mmp: 100,  agi: 100,
-  atk: 100,  def: 100,  luk: 100,
-  mat: 100,  mdf: 100,
-
-  hit: 100,  eva: 100,  cnt: 100,
-  cri: 100,  cev: 100,
-  mev: 100,  mrf: 100,
-  hrg: 100,  mrg: 100,  trg: 100,
-// note1: PDR and MDR want to be lower.
-// note2: TGR, TCR, FDR, and EXR aren't usually used for enemies.
-// tgr: 200, mcr: 200, pha: 100, tcr: 200, exr: 200, fdr: 200,
-  grd: 100,  rec: 100,  pdr: 100,  mdr: 100,
-};
-
-  var hard    = {
-    name: "Hard",
-    exp: 150,  gold: 200, drop: 200,
-
-    mhp: 150,  mmp: 100,  agi: 125,
-    atk: 150,  def: 125,  luk: 150,
-    mat: 150,  mdf: 125,
-
-    hit: 150,  eva: 100,  cnt: 150,
-    cri: 150,  cev: 150,
-    mev: 100,  mrf: 150,
-    hrg: 150,  mrg: 150,  trg: 150,
-  // note1: PDR and MDR want to be lower.
-  // note2: TGR, TCR, FDR, and EXR aren't usually used for enemies.
-  // tgr: 200, mcr: 200, pha: 100, tcr: 200, exr: 200, fdr: 200,
-    grd: 200,  rec: 150,  pdr: 150,  mdr: 150,
-};
-  J.AddOns.Difficulty.Modes.push(easy);   //0 adds "easy" difficulty to the list.
-  J.AddOns.Difficulty.Modes.push(normal); //1 adds "normal" to the list.
-  J.AddOns.Difficulty.Modes.push(hard);   //2 adds "hard" to the list.
   J.AddOns.Difficulty.defaultMode = 1;    // defines the starting difficulty.
   J.AddOns.Difficulty.currentMode = J.AddOns.Difficulty.defaultMode;
-/* -------------------------------------------------------------------------- */
-})(); // end variable stuff
 
 // grabs the rate from the difficulty, and returns the multiplier.
 J.AddOns.Difficulty.convertBparams = function(pId) {
@@ -172,7 +199,19 @@ J.AddOns.Difficulty.getDifficultyName = function(diffMode) {
 
 // sets the difficulty to a fixed difficulty.
 J.AddOns.Difficulty.changeDifficulty = function(newDifficulty) {
+  if (J.AddOns.Difficulty.dVariable > 0)
+    $gameVariables.setValue(J.AddOns.Difficulty.dVariable, newDifficulty);
   J.AddOns.Difficulty.currentMode = newDifficulty;
+};
+
+// finds a given difficulty and returns it's array location.
+// explicitly for use with the PLUGIN COMMANDS
+J.AddOns.Difficulty.findDifficulty = function(diffName) {
+  var modes = J.AddOns.Difficulty.Modes;
+  for (var i = 0; i < modes.length; i++) {
+    if (modes[i].name.toLowerCase() == diffName.toLowerCase()) return i;
+  }
+  return -1;
 };
 
 /* -------------------------------------------------------------------------- */
@@ -234,19 +273,23 @@ Game_Enemy.prototype.gold = function() {
 var _Scene_Menu_jde_createCommandWindow = Scene_Menu.prototype.createCommandWindow;
 Scene_Menu.prototype.createCommandWindow = function() {
   _Scene_Menu_jde_createCommandWindow.call(this);
-  this._commandWindow.setHandler('difficulty', this.commandDifficulty.bind(this));
+  if (J.AddOns.Difficulty.visibility == true) {
+    this._commandWindow.setHandler('difficulty', this.commandDifficulty.bind(this));
+  }
 };
 
 // when command selected, pulls up the new scene.
 Scene_Menu.prototype.commandDifficulty = function() {
-    SceneManager.push(Scene_Difficulty);
+  SceneManager.push(Scene_Difficulty);
 };
 
 // adds the commands into the menu
 var _Menu_jdf_addDifficulties = Window_MenuCommand.prototype.makeCommandList;
 Window_MenuCommand.prototype.makeCommandList = function() {
   _Menu_jdf_addDifficulties.call(this);
-  this.addDifficulties();
+  if (J.AddOns.Difficulty.visibility == true) {
+    this.addDifficulties();
+  }
 };
 
 // the command for adding difficulties to the main menu
@@ -321,7 +364,6 @@ Scene_Difficulty.prototype.update = function() {
   Scene_MenuBase.prototype.update.call(this);
   if (this.lastIndex != this._commandWindow.index()) {
     this.lastIndex = this._commandWindow.index();
-    window.console.log(this._commandWindow.index());
     this._detailsWindow.refresh(this.lastIndex);
   }
 };
@@ -499,5 +541,68 @@ Window_DifficultyDetails.prototype.getColorDiff = function(a, b) {
   }
   else { // if no change, then no color change either
     this.changeTextColor(this.normalColor());
+  }
+};
+
+var j_diff_Game_Interpreter_pluginCommand = Game_Interpreter.prototype.pluginCommand;
+Game_Interpreter.prototype.pluginCommand = function(command, args) {
+  j_diff_Game_Interpreter_pluginCommand.call(this, command, args);
+  // command args[0] args[1] args[2] ...
+  try {
+    if (command === 'JDIFF') {
+      switch (args[0].toLowerCase()) {
+        case 'hide':
+          J.AddOns.Difficulty.visibility = false;
+          break;
+        case 'show':
+          J.AddOns.Difficulty.visibility = true;
+          break;
+        break;
+        case 'add':
+        case 'ADD':
+        J.AddOns.Difficulty.makeDifficulty(args[1], args[2], args[3], args[4], 
+          args[5], args[6], args[7], args[8], args[9], args[10], args[11], args[12],
+          args[13], args[14], args[15], args[16], args[17], args[18], args[19], 
+          args[20], args[21], args[22], args[23], args[24], args[25], args[26]);
+          console.log("Difficulty: " + args[1] + " created.");
+          break;
+        case 'remove':
+        case 'REMOVE':
+          if (J.AddOns.Difficulty.Modes.length < 2) {
+            console.warn("Cannot remove the last difficulty mode.");
+            break;
+          }
+          if (typeof args[1] == 'number') {
+            if (args[1] == 0) {
+              console.warn("Don't worry about 0-indexing.")
+              break;
+            }
+            J.AddOns.Difficulty.Modes.splice((args[1] - 1), 1);
+            J.AddOns.Difficulty.changeDifficulty(0);  
+          } else {
+            var id = J.AddOns.Difficulty.findDifficulty(args[1]);
+            if (id == -1) {
+              console.warn("can't find that difficulty.");
+              break;
+            }
+            J.AddOns.Difficulty.Modes.splice(id, 1);
+            J.AddOns.Difficulty.changeDifficulty(0);
+          }
+          break;
+        case 'change':
+        case 'CHANGE':
+          var id = J.AddOns.Difficulty.findDifficulty(args[1]);
+          if (id == -1) {
+            console.warn("can't find that difficulty.");
+            break;
+          }
+          J.AddOns.Difficulty.changeDifficulty(id);
+          console.log("Difficulty changed to: " + J.AddOns.Difficulty.getDifficultyName(id) + ".");
+          break;
+        default: break;
+      }
+    }
+  } catch(e) {
+    console.warn(e);
   }
 };

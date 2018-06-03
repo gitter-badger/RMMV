@@ -20,8 +20,8 @@
 @help This is a generic HUD plugin. It accomplishes the goal of displaying
       things like HP/MP/TP while on the map.
     The following plugin commands are available:
-     'show' = show HUD; Example 'HUD hide'
-     'hide' = hide HUD; Example 'HUD show'
+     'show' = show HUD; Example 'J_HUD hide'
+     'hide' = hide HUD; Example 'J_HUD show'
 */
 /* -------------------------------------------------------------------------- */
 var Imported = Imported || {};
@@ -33,6 +33,7 @@ J.HUD.Parameters = PluginManager.parameters('J_HUD');
 J.HUD.width = Number(J.HUD.Parameters['HUD_width']);
 J.HUD.height = Number(J.HUD.Parameters['HUD_height']);
 J.HUD.HUDopacity = Number(J.HUD.Parameters['HUD_opacity']);
+J.HUD.visibility = true;
 
 (function() { // start plugin.
 /* -------------------------------------------------------------------------- */
@@ -43,10 +44,14 @@ J.HUD.HUDopacity = Number(J.HUD.Parameters['HUD_opacity']);
   var _Game_Interpreter_jHUD_pluginCommand = Game_Interpreter.prototype.pluginCommand;
   Game_Interpreter.prototype.pluginCommand = function(command, args) {
     _Game_Interpreter_jHUD_pluginCommand.call(this, command, args);
-    if (command === 'HUD') {
+    if (command === 'J_HUD') {
       switch (args[0]) {
-        case 'hide': SoundManager.playOk(); break;
-        case 'show': SoundManager.playOk(); break;
+        case 'hide':
+          J.HUD.visibility = false;
+          break;
+        case 'show':
+          J.HUD.visibility = true;
+          break;
       }
     }
   };
@@ -74,7 +79,7 @@ J.HUD.HUDopacity = Number(J.HUD.Parameters['HUD_opacity']);
       this.addWindow(this._HUDWindow);
       this._HUDWindow.opacity = J.HUD.HUDopacity;
     };
-    if (this.hideExtras()) {
+    if (J.HUD.visibility == false || this.hideExtras()) {
       this._HUDWindow.close();
     }
     else {
@@ -92,10 +97,9 @@ J.HUD.HUDopacity = Number(J.HUD.Parameters['HUD_opacity']);
   // the initialization of the window.
   // effectively, what happens when first called.
   Window_HUD.prototype.initialize = function(x, y) {
-    Window_Base.prototype.initialize.call(this, x, Graphics.height - J.HUD.height,
+    Window_Base.prototype.initialize.call(this, x, y,
       J.HUD.width, J.HUD.height);
       this._updateWait = 0;
-      this.z = 0;
       this.refresh();
       this.activate();
     };
@@ -122,7 +126,20 @@ J.HUD.HUDopacity = Number(J.HUD.Parameters['HUD_opacity']);
         this.contents.clear();
         if (actor) {
           this.drawHUDstatus(actor, 0, 0, 300);
+          //this.drawVariable();
         }
+      }
+    };
+
+    // TODO draw "serum" gauge.
+    Window_HUD.prototype.drawVariable = function() {
+      var drawValue = 0;
+      var x = 50;
+      var y = 50;
+      drawValue = $gameVariables.value(1);
+      var active = $gameSwitches.value(10);
+      if (active) {
+        this.drawText(drawValue, x, y, 100, 'right');
       }
     };
 
@@ -156,12 +173,39 @@ J.HUD.HUDopacity = Number(J.HUD.Parameters['HUD_opacity']);
       this.drawText(actor.tp.toFixed(0), x3, y + lh * 3, 100, 'left');
 
       // draws exp and gauge
-      this.drawEXPgauge(actor, x, y + 10 + lh * 3, barWidth);
+      this.drawEXPgauge(actor, x + 10, y + 10 + lh * 3, barWidth);
       this.drawText(actor.nextRequiredExp(), x, y + 10 + lh * 3, 44);
       this.drawActorLevel(actor, x2 + 128, y);
 
       // draws icons for status buff/debuffs
-      this.drawActorIcons(actor, x + 256, y);
+      this.drawActorIcons(actor, x + 298, y);
+
+      // draws the time from the Orange Time System.
+      //this.drawTime(x + 298, y + lh * 4);
+    };
+
+    Window_HUD.prototype.drawTime = function(x, y) {
+      var seconds = $gameVariables.value(21);
+      var minutes = $gameVariables.value(22);
+      var hours   = $gameVariables.value(23);
+      if (hours > 12) hours -= 12;
+      var timeString = hours + ":" + minutes + ":" + seconds;
+      this.drawText(timeString, x, y, 'right');
+    };
+
+    // modifies for the QABS state timer drawing.
+    Window_Base.prototype.drawActorIcons = function(actor, x, y, width) {
+      width = width || 144;
+      var states = actor.states();
+      var icons = actor.stateIcons().slice(0, Math.floor(width / Window_Base._iconWidth));
+      for (var i = 0; i < icons.length; i++) {
+        this.drawIcon(icons[i], x + Window_Base._iconWidth * i, y + 2);
+        var oldSize = this.contentsHeight.fontSize;
+        this.contents.fontSize = 12;
+        var timer = Number(actor._stateDuration[states[i].id] / 60).toFixed(1);
+        this.drawText(timer, x + Window_Base._iconWidth * i, y + 2)
+        this.contents.fontSize = oldSize;
+      }
     };
 
     // custom method for drawing a gauge for the leader's EXP.
@@ -172,7 +216,7 @@ J.HUD.HUDopacity = Number(J.HUD.Parameters['HUD_opacity']);
       var xp4next = actor.nextLevelExp() - actor.currentLevelExp();
       var cExp = actor.currentExp() - actor.currentLevelExp();
       var expRate = cExp / xp4next;
-      this.drawGaugeMod(x, y+10, width, 12, expRate, color1, color2);
+      this.drawGaugeMod(x, y+10, width, 6, expRate, color1, color2);
     };
 
     // a custom variant of the drawGauge function.
@@ -180,6 +224,7 @@ J.HUD.HUDopacity = Number(J.HUD.Parameters['HUD_opacity']);
     Window_Base.prototype.drawGaugeMod = function(x, y, width, height, rate, color1, color2) {
       var fillW = Math.floor(width * rate);
       var gaugeY = y + height;
+      this.contents.fillRect(x-2, gaugeY-2, width+4, height+4, this.gaugeBackColor());
       this.contents.fillRect(x, gaugeY, width, height, this.gaugeBackColor());
       this.contents.gradientFillRect(x, gaugeY, fillW, height, color1, color2);
     };

@@ -1,9 +1,9 @@
 /* -------------------------------------------------------------------------- */
-// J_critDamage
+// J_CritDamage
 // V: 1.1
 //
 /*:@plugindesc Creates new paramters: CDM/CDR for crit damage manipulation.
-@author Jpoop
+@author J
 @help This plugin uses newly created parameters for allies and enemies to
         calculate crit damage multipliers/reductions.
 

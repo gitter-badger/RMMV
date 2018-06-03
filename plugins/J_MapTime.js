@@ -1,12 +1,16 @@
 /* -------------------------------------------------------------------------- */
 // J_MapTime
-// V: 1.0
+// V: 1.1
 
 /*:@plugindesc Provides functionality for HRG/MRG/TRG while on the map.
 @author J
 
 @param useTPforDash
 @desc Enable/Disable to control dashing with TP availability.
+@default true
+
+@param flatHealing
+@desc HRG/MRG/TRG are naturally %-based, but this can be flat healing, instead.
 @default true
 
 @help This plugin adds the functionality of HP/MP/TP regeneration on the map.
@@ -29,12 +33,6 @@ NOTE: TRG's regeneration is updated 10x faster (1 tick = 3 frames = 0.05s)
   Try making a skill cost like, 15 TP or something and use it as a basic
   attack limiter to prevent the player from swinging excessively.
   If you don't like it, you can just turn it off, too.
-  For reference, it takes 15% TRG to cancel out TP depletion while dashing.
-
- If you intend to use this, I highly recommend you make use of a couple other
- plugins as well:
-    > Some ABS (qABS works, but I don't have a link to the original code)
-    > A functional HUD: http://pastebin.com/53UjUNiZ (I made it myself :] )
 */
 /* -------------------------------------------------------------------------- */
 var Imported = Imported || {};
@@ -43,7 +41,8 @@ Imported.J_MapTime = true;
 var J = J || {};
 J.mapTime = J.mapTime || {};
 J.mapTime.Parameters = PluginManager.parameters('J_MapTime');
-J.mapTime.useTPforDash = String(J.mapTime.Parameters['useTPforDash']);
+J.mapTime.useTPforDash = String(J.mapTime.Parameters['useTPforDash']).toLowerCase() == 'true';
+J.mapTime.flatHealing = String(J.mapTime.Parameters['flatHealing']).toLowerCase() == 'true';
 
 (function() { // start plugin.
 /* -------------------------------------------------------------------------- */
@@ -85,24 +84,66 @@ J.mapTime.useTPforDash = String(J.mapTime.Parameters['useTPforDash']);
     }
   };
 
+  Game_Battler.prototype.regenerateAll = function() {
+    // do nothing and disable MV regeneration
+  };
+
   // Here, HP/MP regeneration is handled based on HRG/MRG.
   // It is significantly slower than TP Regeneration.
-  // Additionally, it is flat regen, not %max regen.
+  // if "poisoned" state is inflicted, natural regen stops.
   Game_Map.prototype.doHPMPregen = function(actor) {
-    var hpRegen = ((actor.hrg * 100) / 2) / 5;
-    var mpRegen = ((actor.mrg * 100) / 2) / 5;
-    actor.gainHp(hpRegen);
-    actor.gainMp(mpRegen);
+    var hRegen, mRegen = 0;
+    var details = this.isPoisoned(actor);
+    if (J.mapTime.flatHealing) {
+      hRegen = ((actor.hrg * 100) / 2) / 5;
+      mRegen = ((actor.mrg * 100) / 2) / 5;  
+    } else {
+      if (details && details[0] == "HP") {
+        hRegen = (details[1] * 100 / 2 / 5);
+      } else {
+        hRegen = ((actor.hrg * actor.mhp) / 2) / 5;
+      }
+      if (details && details[0] == "MP") {
+        mRegen = ((details[1] * 100) / 2) / 5;
+      } else {
+        mRegen = ((actor.mrg * actor.mmp) / 2) / 5;
+      }
+      if (details && details[0] == "BOTH") {
+        hRegen = ((details[1] * 100) / 2) / 5;
+        mRegen = ((details[1] * 100) / 2) / 5;
+      }
+    }
+    actor.gainHp(hRegen);
+    actor.gainMp(mRegen);
+  };
+
+  Game_Map.prototype.isPoisoned = function(actor) {
+    var structure = /<poison:(HP|MP|BOTH)>/i;
+    var aStates = actor.states();
+    var details = [];
+    if (aStates.length <= 0) return false;
+    for (var i = 0; i < aStates.length; i++) {
+      var notedata = aStates[i].note.split(/[\r\n]+/);
+      for (var n = 0; n < notedata.length; n++) {
+        var line = notedata[n];
+        if (line.match(structure)) {
+          details = [RegExp.$1, aStates[i].traits[0].value];
+          return details;
+        }
+      }
+    }
+    return false;
   };
 
   // this rapidly regenerates the player's TP.
-  // and also deplete stamina while dashing.
+  // and also deplete TP while dashing.
   Game_Map.prototype.doTPregen = function(actor) {
     var mod = 0;
-    if (J.mapTime.useTPforDash === "true")
-      mod = Game_Player.prototype.isDashButtonPressed() ? 2.5 : 0.0;
-    var tpRegen = (((actor.trg + 0.1) * 100) / 10) - mod;
-    actor.gainTp(tpRegen);
+    var tpRegen = (((actor.trg + 0.1) * 100) / 10);
+    if (J.mapTime.useTPforDash) {
+      mod = Game_Player.prototype.isDashButtonPressed() ? -0.5 : tpRegen;
+    }
+    actor.gainTp(mod);
   };
 
   // this forces the player to be unable to run while out of TP.

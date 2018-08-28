@@ -77,7 +77,7 @@ J.AddOns = J.AddOns || {};
 J.AddOns.Difficulty =   J.AddOns.Difficulty || {};
 J.AddOns.Difficulty.Modes = [];
 J.AddOns.Difficulty.visibility = true;
-J.AddOns.Difficulty.Parameters = PluginManager.parameters('J_HUD');
+J.AddOns.Difficulty.Parameters = PluginManager.parameters('J_Difficulty');
 J.AddOns.Difficulty.dVariable = Number(J.AddOns.Difficulty.Parameters['Difficulty Variable']);
 
 

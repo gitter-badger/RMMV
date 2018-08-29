@@ -38,7 +38,6 @@ J.SD.MakePanel = (cat = 0, fp = "flat", ea = 5, max = 10, cur = 0, cmult = 1.2, 
       if (rankCur === rankMax) return 0;
       return Math.floor(cmult * (cgrow * (this.rankCur + 1)));
     },
-
   }; 
   return panel;
 };
@@ -53,9 +52,7 @@ J.SD.GetCommandName = function() {
 J.SD.visibility = true;
 
 /* -------------------------------------------------------------------------- */
-console.log("outside.");
 (function(_) { "use strict"; console.log("Beginning setup of SDP.");
-console.log(_.GetCommandName());
   // hook into param + paramBase + paramPlus + clearParamPlus
   // add in the stat distribution points
 
@@ -65,11 +62,9 @@ console.log(_.GetCommandName());
   Game_Actor.prototype.initMembers = function() {
     _.sdpInit.call(this, this);
     this.initSDP();
-    console.log(this);
   };
 
   Game_Actor.prototype.initSDP = function() {
-    console.log("Initializing SDP system.");
     this._sdpCollection = [];   // the collection of panels will be in here.
     this._sdpPts = 0;           // how many points you have to be distributed across your panels.
     let defaultPanel = _.MakePanel();
@@ -146,7 +141,16 @@ console.log(_.GetCommandName());
   // the list of distribution panels based on the character.
   Scene_SDP.prototype.createCommandWindow = function() {
     // make the list of SDP from the actor, here.
+    this._sdpWindow = new Window_SDP_List();
+    this._sdpWindow.setHandler('ok',      this.onSDPok.bind(this));
+    this._sdpWindow.setHandler('cancel',  this.popScene.bind(this));
+    this.addWindow(this._sdpWindow);
+
   };
+
+  Scene_SDP.prototype.onSDPok = function() {
+
+  }
 
   Scene_SDP.prototype.createHelpWindow = function() {
     // draw the description of the panel selected, here.
@@ -159,9 +163,15 @@ console.log(_.GetCommandName());
   Window_SDP_List.prototype = Object.create(Window_Selectable.prototype);
   Window_SDP_List.prototype.constructor = Window_SDP_List;
 
-  Window_SDP_List.prototype.initialize = function(x, y, width, height) {
+  Window_SDP_List.prototype.initialize = function() {
+    let width = Graphics.boxWidth;
+    let height = Graphics.boxHeight;
+    let x = 0;
+    let y = 0;
     Window_Selectable.prototype.initialize.call(this, x, y, width, height);
-    this._actor = null;
+    this._SDPs = [];
+    this._data = [];
+    this._actor = $gameParty.members()[0];
     this.refresh();
   };
 
@@ -173,9 +183,44 @@ console.log(_.GetCommandName());
   };
   Window_SDP_List.prototype.update = function() {
     Window_Selectable.prototype.update.call(this);
+    console.log("updating!");
     // do update things
   };
 
+  Window_SDP_List.prototype.refresh = function() {
+    // update list
+    console.log("refreshing!");
+    this.drawAllItems();
+    this.makeSDPList();
+    this.createContents();
+  };
+
+  Window_SDP_List.prototype.makeSDPList = function() {
+    this._price = [];
+    this._actor._sdpCollection.forEach((SDPS, index) => {
+      this._SDPs.push(SDPS[index]);
+    }, this);
+    // do calculations for whats in the "cart"?
+  };
+
+  Window_SDP_List.prototype.drawItem = function() {
+    console.log("drawing items!");
+    let item = this._data[index].category;
+    let rect = this.itemRect(item);
+    let priceWidth = 96;
+    rect.width -= this.textPadding();
+    this.drawItemName(item, rect.x, rect.y, rect.width - priceWidth);
+    this.drawText(this.price(item), rect.x + rect.width - priceWidth,
+                  rect.y, priceWidth, 'right');
+    this.changePaintOpacity(true);
+  };
+
+  Window_SDP_List.prototype.updateHelp = function() {
+    this.setHelpWindowItem(this.item());
+    if (this._statusWindow) {
+        this._statusWindow.setItem(this.item());
+    }
+};
   
 
 })(J.SD);
